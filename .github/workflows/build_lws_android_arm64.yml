@@ -1,0 +1,59 @@
+# This is a basic workflow to help you get started with Actions
+
+name: lws-arm-arm64
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: Scripts
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Android NDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.1.13356709"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.1.13356709" >> $GITHUB_ENV
+
+      # Runs a single command using the runners shell
+      - name: Fetch lws
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake
+
+          cd $GITHUB_WORKSPACE
+          git clone https://libwebsockets.org/repo/libwebsockets
+          cd libwebsockets
+          git checkout v4.3-stable
+
+      - name: Build lws
+        run: |
+          cd $GITHUB_WORKSPACE/libwebsockets
+          mkdir out
+          cd out
+          cmake -DLWS_WITH_SSL=0 -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/Scripts/cross-aarch64-android.cmake" ..
+          cmake --build . --config Release
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          path: |
+            libwebsockets/out/include/
+            libwebsockets/out/lib/libwebsockets.a
+          name: prebuilt_lws_android_arm64
+
+
