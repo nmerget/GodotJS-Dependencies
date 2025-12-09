@@ -50,12 +50,12 @@ jobs:
           mkdir v8
           cd v8
           echo _____fetch_____
-          call fetch v8 --nohooks
+          call fetch --nohooks v8
           echo _____enter_____
           cd v8
           echo _____checkout_____
           call git fetch origin refs/tags/%V8_VERSION%
-          call git checkout origin refs/tags/%V8_VERSION%
+          call git checkout FETCH_HEAD
           echo _____sync_____
           call gclient sync -D --force --reset
 

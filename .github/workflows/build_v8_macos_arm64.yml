@@ -39,7 +39,7 @@ jobs:
           fetch --nohooks v8
           cd v8
           git fetch origin refs/tags/${{ env.V8_VERSION }}
-          git checkout origin refs/tags/${{ env.V8_VERSION }}
+          git checkout FETCH_HEAD
           gclient sync -D --force --reset
 
       - name: Build v8 arm64

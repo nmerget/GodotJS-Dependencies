@@ -88,12 +88,12 @@ jobs:
           gclient
           mkdir -p $GITHUB_WORKSPACE/v8
           cd $GITHUB_WORKSPACE/v8
-          fetch v8 --nohooks
+          fetch --nohooks v8
           echo "target_os = ['android']" >> .gclient
           cat .gclient
           cd v8
           git fetch origin refs/tags/${{ env.V8_VERSION }}
-          git checkout origin refs/tags/${{ env.V8_VERSION }}
+          git checkout FETCH_HEAD
           gclient sync -D --force --reset
 
       - name: Build v8 x86_64
