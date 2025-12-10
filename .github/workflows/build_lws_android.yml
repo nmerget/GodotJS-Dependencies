@@ -76,8 +76,9 @@ jobs:
             -DANDROID_PLATFORM=${{ matrix.android_platform }} \
             -DBUILD_SHARED_LIBS=OFF \
             -DLWS_WITH_SSL=0 \
+            -DCMAKE_BUILD_TYPE=Release \
             ${{ matrix.cmake || '' }} \
-            -DCMAKE_BUILD_TYPE=Release ..
+            ..
           cmake --build . --config Release -j$(nproc)
           cd "$GITHUB_WORKSPACE"
           mkdir -p staging/lws/android_${{ matrix.arch }}_release
