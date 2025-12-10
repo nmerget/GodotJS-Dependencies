@@ -1,0 +1,88 @@
+name: Publish Release
+
+on:
+  workflow_call:
+    inputs:
+      bundle_tag:
+        description: 'package version tag'
+        type: string
+        required: true
+      v8_version:
+        description: 'v8 version tag'
+        type: string
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: staging/
+          merge-multiple: true
+
+      - name: packaging
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends zip unzip
+          echo "Downloaded artifacts layout:"
+          ls -R staging || true
+
+          # Normalize layout if some artifacts included an extra staging/ prefix
+          if [ -d "staging/staging/v8" ] && [ ! -d "staging/v8" ]; then
+            mv staging/staging/v8 staging/ || true
+          fi
+          if [ -d "staging/staging/lws" ] && [ ! -d "staging/lws" ]; then
+            mv staging/staging/lws staging/ || true
+          fi
+
+          # Create V8 bundle only if present
+          if [ -d "staging/v8" ]; then
+            (cd staging && zip -r "v8_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip" v8/)
+            echo "Created V8 bundle: staging/v8_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip"
+          else
+            echo "No staging/v8 directory found; skipping V8 bundling."
+          fi
+
+          # Create LWS bundle only if present
+          if [ -d "staging/lws" ]; then
+            (cd staging && zip -r "lws_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip" lws/)
+            echo "Created LWS bundle: staging/lws_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip"
+          else
+            echo "No staging/lws directory found; skipping LWS bundling."
+          fi
+
+      - uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v8_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}
+          release_name: v8_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}
+          draft: false
+          prerelease: false
+          body: |
+            Update V8 and LWS bundles.
+
+      - name: Upload V8 asset
+        if: ${{ hashFiles(format('staging/{0}_{1}_{2}.zip', 'v8', inputs.v8_version, inputs.bundle_tag)) != '' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: staging/v8_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip
+          asset_name: v8_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload LWS asset
+        if: ${{ hashFiles(format('staging/{0}_{1}_{2}.zip', 'lws', inputs.v8_version, inputs.bundle_tag)) != '' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: staging/lws_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip
+          asset_name: lws_${{ inputs.v8_version }}_${{ inputs.bundle_tag }}.zip
+          asset_content_type: application/zip
