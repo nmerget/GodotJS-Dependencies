@@ -1,4 +1,4 @@
-name: v8-macos-arm64
+name: v8-ios
 
 on:
   workflow_dispatch:
@@ -16,6 +16,14 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64]
+        include:
+          - arch: arm64
+            v8_arch: arm64
+            args_file: v8.ios_arm64.args.gn
+    
     env:
       V8_VERSION: ${{ inputs.v8_version || github.event.inputs.v8_version }}
 
@@ -33,8 +41,6 @@ jobs:
       - name: Fetch v8
         run: |
           cd $GITHUB_WORKSPACE
-          pwd
-
           git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
           export PATH=$GITHUB_WORKSPACE/depot_tools:$PATH
           cd depot_tools
@@ -42,26 +48,27 @@ jobs:
           mkdir $GITHUB_WORKSPACE/v8
           cd $GITHUB_WORKSPACE/v8
           fetch --nohooks --nohistory v8
+          echo "target_os = ['ios']" >> .gclient
+          cat .gclient
           cd v8
           git fetch origin refs/tags/${{ env.V8_VERSION }}
           git checkout FETCH_HEAD
           gclient sync -D --force --reset
 
-      - name: Build v8 arm64
+      - name: Build v8 ios-${{ matrix.arch }}
         run: |
           export PATH=$GITHUB_WORKSPACE/depot_tools:$PATH
           cd $GITHUB_WORKSPACE/v8/v8
-          python ./tools/dev/v8gen.py arm64.release
-          cp $GITHUB_WORKSPACE/Scripts/v8.macos_arm64.args.gn $GITHUB_WORKSPACE/v8/v8/out.gn/arm64.release/args.gn
-          ls -l $GITHUB_WORKSPACE/depot_tools/ninja 
-          ls -l $GITHUB_WORKSPACE/depot_tools/autoninja 
-          ninja -C ./out.gn/arm64.release v8_monolith
+          ls -l ./build/
+          python ./tools/dev/v8gen.py ${{ matrix.v8_arch }}.release
+          cp $GITHUB_WORKSPACE/Scripts/${{ matrix.args_file }} $GITHUB_WORKSPACE/v8/v8/out.gn/${{ matrix.v8_arch }}.release/args.gn
+          cat $GITHUB_WORKSPACE/v8/v8/out.gn/${{ matrix.v8_arch }}.release/args.gn
+          ls -l $GITHUB_WORKSPACE/depot_tools/ninja
+          ninja -C ./out.gn/${{ matrix.v8_arch }}.release v8_monolith
 
       - name: Upload
         if: ${{ env.ACTIONS_RUNTIME_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
-          path: v8/v8/out.gn/arm64.release/obj/libv8_monolith.a
-          name: prebuilt_v8_macos_arm64
-
-
+          path: v8/v8/out.gn/${{ matrix.v8_arch }}.release/obj/libv8_monolith.a
+          name: prebuilt_v8_ios_${{ matrix.arch }}

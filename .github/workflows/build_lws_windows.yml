@@ -1,4 +1,4 @@
-name: lws-windows-x86_64
+name: lws-windows
 
 on:
   workflow_dispatch:
@@ -7,6 +7,15 @@ on:
 jobs:
   build:
     runs-on: windows-2022
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+        include:
+          - arch: x86_64
+            cmake_arch: x64
+          - arch: arm64
+            cmake_arch: ARM64
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Fetch lws (windows x86_64)
+      - name: Fetch lws (windows ${{ matrix.arch }})
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
@@ -30,25 +39,25 @@ jobs:
           cd libwebsockets
           git checkout v4.3-stable
 
-      - name: Build lws (windows x86_64)
+      - name: Build lws (windows ${{ matrix.arch }})
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
           cd "$env:GITHUB_WORKSPACE/libwebsockets"
           New-Item -ItemType Directory -Force -Path out | Out-Null
           cd out
-          cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=OFF -DLWS_WITH_SSL=0 -DCMAKE_BUILD_TYPE=Release ..
+          cmake -G "Visual Studio 17 2022" -A ${{ matrix.cmake_arch }} -DBUILD_SHARED_LIBS=OFF -DLWS_WITH_SSL=0 -DCMAKE_BUILD_TYPE=Release ..
           cmake --build . --config Release -- /m
           cd "$env:GITHUB_WORKSPACE"
-          New-Item -ItemType Directory -Force -Path staging/lws/windows_x86_64_release | Out-Null
-          Copy-Item -Recurse libwebsockets/include staging/lws/windows_x86_64_release/
+          New-Item -ItemType Directory -Force -Path staging/lws/windows_${{ matrix.arch }}_release | Out-Null
+          Copy-Item -Recurse libwebsockets/include staging/lws/windows_${{ matrix.arch }}_release/
           $lib = Get-ChildItem -Path libwebsockets -Recurse -Filter "*websockets*.lib" | Where-Object { $_.FullName -match "Release" } | Select-Object -First 1
           if (-not $lib) { $lib = Get-ChildItem -Path libwebsockets -Recurse -Filter "*websockets*.lib" | Select-Object -First 1 }
-          Copy-Item $lib.FullName staging/lws/windows_x86_64_release/
+          Copy-Item $lib.FullName staging/lws/windows_${{ matrix.arch }}_release/
 
-      - name: Upload lws (windows x86_64)
+      - name: Upload lws (windows ${{ matrix.arch }})
         if: ${{ env.ACTIONS_RUNTIME_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: prebuilt_lws_windows_x86_64
+          name: prebuilt_lws_windows_${{ matrix.arch }}
           path: staging/
