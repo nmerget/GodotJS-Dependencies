@@ -1,4 +1,4 @@
-name: v8-linux-x86_64
+name: v8-linux
 
 on:
   workflow_dispatch:
@@ -16,6 +16,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+        include:
+          - arch: x86_64
+            v8_arch: x64
+            args_file: v8.linux_x86_64.args.gn
+          - arch: arm64
+            v8_arch: arm64
+            args_file: v8.linux_arm64.args.gn
+            sysroot_arch: arm64
+    
     env:
       V8_VERSION: ${{ inputs.v8_version || github.event.inputs.v8_version }}
 
@@ -63,7 +75,7 @@ jobs:
           git checkout FETCH_HEAD
           gclient sync -D --force --reset
 
-      - name: Build v8 x86_64
+      - name: Build v8 ${{ matrix.arch }}
         run: |
           set -euo pipefail
           echo "Disk before build-deps:"
@@ -71,20 +83,20 @@ jobs:
           cd $GITHUB_WORKSPACE/v8/v8
 
           sh ./build/install-build-deps.sh
-
+ 
           # Clean apt caches after heavy install
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
-          python ./tools/dev/v8gen.py x64.release
-          cp $GITHUB_WORKSPACE/Scripts/v8.linux_x86_64.args.gn $GITHUB_WORKSPACE/v8/v8/out.gn/x64.release/args.gn
-          ls -l $GITHUB_WORKSPACE/v8/v8/out.gn/x64.release/
-          ninja -C ./out.gn/x64.release v8_monolith
+          
+          ${{ matrix.sysroot_arch && format('python ./build/linux/sysroot_scripts/install-sysroot.py --arch={0}', matrix.sysroot_arch) || '' }}
+          python ./tools/dev/v8gen.py ${{ matrix.v8_arch }}.release
+          cp $GITHUB_WORKSPACE/Scripts/${{ matrix.args_file }} $GITHUB_WORKSPACE/v8/v8/out.gn/${{ matrix.v8_arch }}.release/args.gn
+          ls -l $GITHUB_WORKSPACE/v8/v8/out.gn/${{ matrix.v8_arch }}.release/
+          ninja -C ./out.gn/${{ matrix.v8_arch }}.release v8_monolith
 
       - name: Upload
         if: ${{ env.ACTIONS_RUNTIME_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
-          path: v8/v8/out.gn/x64.release/obj/libv8_monolith.a
-          name: prebuilt_v8_linux_x86_64
-
-
+          path: v8/v8/out.gn/${{ matrix.v8_arch }}.release/obj/libv8_monolith.a
+          name: prebuilt_v8_linux_${{ matrix.arch }}

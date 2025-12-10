@@ -1,4 +1,4 @@
-name: lws-macos-x86_64
+name: lws-macos
 
 on:
   workflow_dispatch:
@@ -7,6 +7,10 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +34,7 @@ jobs:
             echo "PATH=$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH" >> $GITHUB_ENV
           fi
 
-      - name: Fetch lws (macOS x86_64)
+      - name: Fetch lws (macOS ${{ matrix.arch }})
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -38,7 +42,7 @@ jobs:
           cd libwebsockets
           git checkout v4.3-stable
 
-      - name: Build lws (macOS x86_64)
+      - name: Build lws (macOS ${{ matrix.arch }})
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/libwebsockets"
@@ -56,18 +60,17 @@ jobs:
             -DBUILD_TESTING=OFF \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
             ..
           cmake --build . --config Release -- -j2
           cd "$GITHUB_WORKSPACE"
-          mkdir -p staging/lws/macos_x86_64_release
-          cp -a libwebsockets/include staging/lws/macos_x86_64_release/
-          /bin/bash -c 'cd libwebsockets; p=$(find out -name libwebsockets.a -print -quit); cp "$p" "$GITHUB_WORKSPACE/staging/lws/macos_x86_64_release/"'
+          mkdir -p staging/lws/macos_${{ matrix.arch }}_release
+          cp -a libwebsockets/include staging/lws/macos_${{ matrix.arch }}_release/
+          /bin/bash -c 'cd libwebsockets; p=$(find out -name libwebsockets.a -print -quit); cp "$p" "$GITHUB_WORKSPACE/staging/lws/macos_${{ matrix.arch }}_release/"'
 
-      - name: Upload lws (macOS x86_64)
+      - name: Upload lws (macOS ${{ matrix.arch }})
         if: ${{ env.ACTIONS_RUNTIME_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: prebuilt_lws_macos_x86_64
+          name: prebuilt_lws_macos_${{ matrix.arch }}
           path: staging/
-

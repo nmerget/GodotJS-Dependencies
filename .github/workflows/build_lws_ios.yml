@@ -1,4 +1,4 @@
-name: lws-ios-arm64
+name: lws-ios
 
 on:
   workflow_dispatch:
@@ -7,6 +7,10 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64]
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +42,7 @@ jobs:
           cd libwebsockets
           git checkout v4.3-stable
 
-      - name: Configure and build lws (iOS Device arm64)
+      - name: Configure and build lws (iOS Device ${{ matrix.arch }})
         run: |
           set -euo pipefail
           export SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -62,26 +66,26 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT="${SDK_PATH}" \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 ..
           cmake --build . --config Release -j$(sysctl -n hw.ncpu || echo 4)
 
-      - name: Stage artifact (iOS Device arm64)
+      - name: Stage artifact (iOS Device ${{ matrix.arch }})
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          mkdir -p staging/lws/ios_arm64_release
-          cp -a libwebsockets/include staging/lws/ios_arm64_release/
+          mkdir -p staging/lws/ios_${{ matrix.arch }}_release
+          cp -a libwebsockets/include staging/lws/ios_${{ matrix.arch }}_release/
           LWS_LIB_PATH=$(cd libwebsockets/out && find . -name 'libwebsockets.a' -print -quit)
           if [ -z "$LWS_LIB_PATH" ]; then
             echo "libwebsockets.a not found" >&2
             exit 1
           fi
-          cp "libwebsockets/out/${LWS_LIB_PATH}" staging/lws/ios_arm64_release/
+          cp "libwebsockets/out/${LWS_LIB_PATH}" staging/lws/ios_${{ matrix.arch }}_release/
 
-      - name: Upload lws (ios arm64)
+      - name: Upload lws (ios ${{ matrix.arch }})
         if: ${{ env.ACTIONS_RUNTIME_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: prebuilt_lws_ios_arm64
+          name: prebuilt_lws_ios_${{ matrix.arch }}
           path: staging/
